@@ -1,7 +1,7 @@
 import requests
 
 API_URL = "https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn"
-headers = {"Authorization": "Bearer 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",
+headers = {"Authorization": "Bearer hf_xxxxxxxxxxxxxxx",  # replace with your hugging face api token
            "Content-Type": "application/json"}
 
 data = {
