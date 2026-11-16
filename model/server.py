@@ -1,30 +1,90 @@
-from pydantic import BaseModel   # Import BaseModel to define the structure of JSON input
-from fastapi import FastAPI      # Import FastAPI to create API endpoints
-from fastapi.middleware.cors import CORSMiddleware # Import CORS middleware to handle cross-origin requests
-import main                      # Import your main file where text_summary function exists
 
-app = FastAPI()                  # Create a FastAPI application instance
+import os
+import requests
 
-# Configure CORS to allow requests from the frontend
-app.add_middleware( 
-    CORSMiddleware, 
-    allow_origins=["*"],         # Allow all origins (you can specify your frontend URL here) 
-    allow_methods=["*"],         # Allow all HTTP methods
-    allow_headers=["*"]          # Allow all headers
-    )
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+import main
+
+app = FastAPI(
+    title="AI Text Summarizer",
+    description="Text summarization API using BART and Hugging Face",
+    version="1.0.0"
+)
+
+# Configure frontend origin
+frontend_origin = os.getenv("FRONTEND_ORIGIN", "*")
+
+allowed_origins = [
+    origin.strip()
+    for origin in frontend_origin.split(",")
+    if origin.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
+)
 
 
-class TextRequest(BaseModel):    # Define a model that describes the expected request body
-    text: str                    # Declare that the JSON must contain a field "text" of type string
+class TextRequest(BaseModel):
+    text: str = Field(min_length=1)
 
 
-@app.post('/summarize')          # Create a POST API endpoint at URL /summarize
-async def summarize_text(text_request: TextRequest):  # Receive JSON body and store it in text_request
-    summary = main.text_summary(text_request.text)    # Call your summarization function using the input text
-
-    return {                    # Return response in JSON format
-        "summary": summary      # Send the generated summary back to the user
+@app.get("/")
+def home():
+    return {
+        "message": "AI Text Summarizer API is running"
     }
 
+
+@app.get("/health")
+def health():
+    return {
+        "status": "healthy"
+    }
+
+
+@app.post("/summarize")
+def summarize_text(text_request: TextRequest):
+
+    text = text_request.text.strip()
+
+    if not text:
+        raise HTTPException(
+            status_code=422,
+            detail="Please enter text to summarize."
+        )
+
+    try:
+        summary = main.text_summary(text)
+
+        return {
+            "summary": summary
+        }
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc)
+        )
+
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=str(exc)
+        )
+
+
 if __name__ == "__main__":
-   app.run()
+    import uvicorn
+
+    uvicorn.run(
+        "server:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "8000"))
+    )
