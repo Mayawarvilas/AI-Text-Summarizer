@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             // Replace with your actual API endpoint
-            const response = await fetch('http://127.0.0.1:8000/summarize', {
+            const response = await fetch('/summarize', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -65,7 +65,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
             });
 
-            if (!response.ok) throw new Error('API request failed');
+            if (!response.ok) {
+                 throw new Error(
+             data.detail || data.error || `API Error: ${response.status}`
+             );
+            }
 
             const data = await response.json();
             
