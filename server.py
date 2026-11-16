@@ -1,67 +1,86 @@
 
 import os
-import requests
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 import main
 
+# Project directory
+BASE_DIR = Path(__file__).resolve().parent
+
 app = FastAPI(
     title="AI Text Summarizer",
-    description="Text summarization API using BART and Hugging Face",
+    description="Text summarization using BART and Hugging Face",
     version="1.0.0"
 )
 
-# Configure frontend origin
-frontend_origin = os.getenv("FRONTEND_ORIGIN", "*")
 
-allowed_origins = [
-    origin.strip()
-    for origin in frontend_origin.split(",")
-    if origin.strip()
-]
+# ----------------------------
+# Frontend routes
+# ----------------------------
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "Authorization"],
-)
-
-
-class TextRequest(BaseModel):
-    text: str = Field(min_length=1)
-
-
-@app.get("/")
+@app.get("/", include_in_schema=False)
 def home():
-    return {
-        "message": "AI Text Summarizer API is running"
-    }
+    return FileResponse(BASE_DIR / "index.html")
 
+
+@app.get("/style.css", include_in_schema=False)
+def get_css():
+    return FileResponse(
+        BASE_DIR / "style.css",
+        media_type="text/css"
+    )
+
+
+@app.get("/script.js", include_in_schema=False)
+def get_js():
+    return FileResponse(
+        BASE_DIR / "script.js",
+        media_type="application/javascript"
+    )
+
+
+# ----------------------------
+# Health check
+# ----------------------------
 
 @app.get("/health")
 def health():
-    return {
-        "status": "healthy"
-    }
+    return {"status": "healthy"}
 
+
+# ----------------------------
+# API request model
+# ----------------------------
+
+class TextRequest(BaseModel):
+    text: str = Field(min_length=1)
+    length: int = Field(default=3, ge=1, le=5)
+
+
+# ----------------------------
+# Summarization API
+# ----------------------------
 
 @app.post("/summarize")
-def summarize_text(text_request: TextRequest):
+def summarize_text(request: TextRequest):
 
-    text = text_request.text.strip()
+    text = request.text.strip()
 
     if not text:
         raise HTTPException(
             status_code=422,
-            detail="Please enter text to summarize."
+            detail="Please enter some text."
         )
 
     try:
-        summary = main.text_summary(text)
+        summary = main.text_summary(
+            text,
+            request.length
+        )
 
         return {
             "summary": summary
@@ -79,6 +98,10 @@ def summarize_text(text_request: TextRequest):
             detail=str(exc)
         )
 
+
+# ----------------------------
+# Local development
+# ----------------------------
 
 if __name__ == "__main__":
     import uvicorn
